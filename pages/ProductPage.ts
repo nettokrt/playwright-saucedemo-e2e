@@ -20,4 +20,13 @@ export class ProductPage extends BasePage {
   getItems() {
     return this.page.locator('.inventory_item');
   }
+
+  async getItemNames() {
+    return this.page.locator('.inventory_item_name').allTextContents();
+  }
+
+  async getItemPrices() {
+    const raw = await this.page.locator('.inventory_item_price').allTextContents();
+    return raw.map((p) => parseFloat(p.replace('$', '')));
+  }
 }
