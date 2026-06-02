@@ -38,7 +38,7 @@ test.describe('Checkout', () => {
 
     await checkoutPage.fillInformation('', 'Doe', '12345');
     await checkoutPage.continue();
-    await expect(checkoutPage.errorMessage).toHaveText('First Name is required');
+    await expect(checkoutPage.errorMessage).toHaveText('Error: First Name is required');
   });
 
   test('TC-K03: checkout requires last name', async ({ page }) => {
@@ -46,7 +46,7 @@ test.describe('Checkout', () => {
 
     await checkoutPage.fillInformation('John', '', '12345');
     await checkoutPage.continue();
-    await expect(checkoutPage.errorMessage).toHaveText('Last Name is required');
+    await expect(checkoutPage.errorMessage).toHaveText('Error: Last Name is required');
   });
 
   test('TC-K04: checkout requires postal code', async ({ page }) => {
@@ -54,6 +54,6 @@ test.describe('Checkout', () => {
 
     await checkoutPage.fillInformation('John', 'Doe', '');
     await checkoutPage.continue();
-    await expect(checkoutPage.errorMessage).toHaveText('Postal Code is required');
+    await expect(checkoutPage.errorMessage).toHaveText('Error: Postal Code is required');
   });
 });
