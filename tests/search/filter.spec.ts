@@ -1,10 +1,9 @@
-import { test, expect } from '@playwright/test';
-import { LoginPage } from '../../pages/LoginPage';
+import { test, expect } from '../../fixtures/test';
 import { ProductPage } from '../../pages/ProductPage';
 
 // These scenarios verify the *full response* of the sort filter — the complete
 // ordered list it returns — not just the first item. Selectors and the exact
-// expected orderings were harvested from the live SauceDemo DOM via Playwright MCP.
+// expected orderings were harvested from the live SauceDemo DOM.
 
 const NAMES_AZ = [
   'Sauce Labs Backpack',
@@ -18,10 +17,8 @@ const NAMES_AZ = [
 test.describe('Inventory Filter Response', () => {
   let productPage: ProductPage;
 
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.loginAsStandardUser();
+  test.beforeEach(async ({ loginAs, page }) => {
+    await loginAs('standard');
     productPage = new ProductPage(page);
   });
 
