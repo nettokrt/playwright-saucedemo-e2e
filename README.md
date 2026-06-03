@@ -1,5 +1,7 @@
 # SauceDemo Playwright E2E
 
+[![CI](https://github.com/nettokrt/playwright-saucedemo-e2e/actions/workflows/playwright.yml/badge.svg)](https://github.com/nettokrt/playwright-saucedemo-e2e/actions/workflows/playwright.yml)
+
 End-to-end test suite for [SauceDemo](https://www.saucedemo.com) built with
 [Playwright](https://playwright.dev) and TypeScript, using the Page Object Model.
 
@@ -9,6 +11,7 @@ End-to-end test suite for [SauceDemo](https://www.saucedemo.com) built with
 - TypeScript
 - Page Object Model (`pages/`)
 - Custom test fixtures (`fixtures/`) — a typed `loginAs(userKey)` / `loginPage` layer
+- API testing via the `request` fixture (separate `api` project — see below)
 - ESLint (`typescript-eslint` + `eslint-plugin-playwright`)
 - GitHub Actions CI
 
@@ -26,7 +29,8 @@ tests/
   shop/cart.spec.ts         Add / remove / view cart
   shop/checkout.spec.ts     Full checkout flow + required-field validation
   defects/bug-users.spec.ts Known SauceDemo defects, documented via test.fail()
-playwright.config.ts        Runs against https://www.saucedemo.com
+  api/booking.spec.ts       API CRUD against restful-booker (request fixture)
+playwright.config.ts        Projects: e2e (saucedemo) + api (restful-booker)
 eslint.config.mjs           Flat ESLint config
 .github/workflows/          CI pipeline (lint + tests)
 ```
@@ -45,6 +49,7 @@ Specs import `test`/`expect` from `fixtures/test` and authenticate through the
 | Cart     | TC-C01–C04  | Add item, add multiple, item shown in cart, remove item |
 | Checkout | TC-K01–K04  | Full purchase flow, first/last name & postal code validation |
 | Defects  | TC-B01–B08  | Known broken seed users (see [Defect Documentation](#defect-documentation-bug-users)) |
+| API      | TC-A01–A09  | restful-booker CRUD: ping, auth, create/read/update/delete, negative auth (see [API Testing](#api-testing)) |
 
 ## Running
 
@@ -55,6 +60,9 @@ npm test                 # headed locally; headless in CI (CI env var)
 npm run test:ui          # interactive UI mode
 npm run report           # open last HTML report
 npm run lint             # eslint
+
+npx playwright test --project=e2e   # just the SauceDemo UI suite
+npx playwright test --project=api   # just the restful-booker API suite
 ```
 
 The suite runs **headed locally** for debugging and **headless in CI**
@@ -82,6 +90,24 @@ passing test.
 | TC-B08  | `performance_glitch_user`| Inventory load is artificially delayed (~5s vs <100ms) |
 
 Behavior was first observed by driving the live site, then encoded as assertions.
+
+## API Testing
+
+SauceDemo is a client-side-only app with **no backend API**, so API coverage is demonstrated
+against [restful-booker](https://restful-booker.herokuapp.com) — a public practice API with
+token auth and full CRUD. It runs as a separate Playwright **`api` project** (its own
+`baseURL`, no browser) using the built-in `request` fixture, so it stays isolated from the
+UI suite:
+
+```bash
+npx playwright test --project=api
+```
+
+`tests/api/booking.spec.ts` covers a health check, auth token retrieval, a serial
+create → read → list → update → patch → delete lifecycle, and a negative-auth case (403).
+
+> restful-booker runs on Heroku's free tier — cold starts can be slow (the `api` project uses
+> a 60s timeout) and it's an external dependency in CI, where `retries: 1` absorbs transient blips.
 
 ## CI
 
