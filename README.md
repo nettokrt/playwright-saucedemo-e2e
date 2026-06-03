@@ -5,6 +5,16 @@
 End-to-end test suite for [SauceDemo](https://www.saucedemo.com) built with
 [Playwright](https://playwright.dev) and TypeScript, using the Page Object Model.
 
+## Related repositories
+
+This repo is the runnable test suite in a three-part QA portfolio:
+
+| Repo | What it is |
+|------|------------|
+| **[nettokrt/playwright-saucedemo-e2e](https://github.com/nettokrt/playwright-saucedemo-e2e)** | **(this repo)** The Playwright (TypeScript) E2E suite against SauceDemo — Page Object Model, custom fixtures (`loginAs` / `loginPage`), ESLint quality gate, and GitHub Actions CI. |
+| **[nettokrt/personal-knowledge-playwright](https://github.com/nettokrt/personal-knowledge-playwright)** | The QA knowledge vault — an [Obsidian](https://obsidian.md) study vault with the notes, plans, and test-case specs behind this suite. The *why* and the connective tissue between the repos. |
+| **[nettokrt/agents](https://github.com/nettokrt/agents)** | The QA Agent Pipeline — a 4-agent system (Anthropic SDK + server-side MCP) that refines a user story, models scenarios, generates self-healing Playwright specs, and triages CI failures into Jira. |
+
 ## Stack
 
 - Playwright Test (`@playwright/test`)
