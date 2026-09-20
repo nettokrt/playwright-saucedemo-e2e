@@ -4,7 +4,12 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   retries: 1,
-  reporter: 'html',
+  reporter: [
+    ['list'],
+    ['html'],
+    // Machine-readable input for `npm run review` (scripts/review-report.mjs).
+    ['json', { outputFile: 'test-results/results.json' }],
+  ],
   projects: [
     {
       name: 'e2e',

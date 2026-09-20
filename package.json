@@ -6,6 +6,8 @@
     "test": "npx playwright test",
     "test:ui": "npx playwright test --ui",
     "report": "npx playwright show-report",
+    "review": "node scripts/review-report.mjs --out playwright-report/review.md --json playwright-report/review.json",
+    "review:test": "node --test scripts/review-report.test.mjs",
     "lint": "eslint ."
   },
   "devDependencies": {

@@ -23,6 +23,7 @@ This repo is the runnable test suite in a three-part QA portfolio:
 - Custom test fixtures (`fixtures/`) — a typed `loginAs(userKey)` / `loginPage` layer
 - API testing via the `request` fixture (separate `api` project — see below)
 - ESLint (`typescript-eslint` + `eslint-plugin-playwright`)
+- Automated report review (`scripts/review-report.mjs`) — triages the JSON report into a verdict
 - GitHub Actions CI
 
 ## Structure
@@ -40,6 +41,9 @@ tests/
   shop/checkout.spec.ts     Full checkout flow + required-field validation
   defects/bug-users.spec.ts Known SauceDemo defects, documented via test.fail()
   api/booking.spec.ts       API CRUD against restful-booker (request fixture)
+scripts/
+  review-report.mjs         Automated report review: triages the JSON report into a verdict
+  review-report.test.mjs    Unit tests for the triage rules (node --test)
 playwright.config.ts        Projects: e2e (saucedemo) + api (restful-booker)
 eslint.config.mjs           Flat ESLint config
 .github/workflows/          CI pipeline (lint + tests)
@@ -69,6 +73,8 @@ npx playwright install   # download browsers
 npm test                 # headed locally; headless in CI (CI env var)
 npm run test:ui          # interactive UI mode
 npm run report           # open last HTML report
+npm run review           # automated review of the last run (see below)
+npm run review:test      # unit tests for the review rules
 npm run lint             # eslint
 
 npx playwright test --project=e2e   # just the SauceDemo UI suite
@@ -119,8 +125,63 @@ create → read → list → update → patch → delete lifecycle, and a negati
 > restful-booker runs on Heroku's free tier — cold starts can be slow (the `api` project uses
 > a 60s timeout) and it's an external dependency in CI, where `retries: 1` absorbs transient blips.
 
+## Automated Report Review
+
+A green/red count is not a review. `npm test` writes a machine-readable report to
+`test-results/results.json`, and `npm run review` turns it into a triaged verdict:
+
+```bash
+npm test          # runs the suite; the json reporter writes test-results/results.json
+npm run review    # prints the review, writes playwright-report/review.{md,json}
+```
+
+What the review answers that the HTML report does not:
+
+| Question | How it is answered |
+|---|---|
+| Is this a product bug or the environment? | Every first failure is matched against ordered rules — assertion failures are `product`, `net::ERR_*` / TLS / browser-launch errors are `environment`, selector ambiguity is `test-debt`, timeouts are `suspect` |
+| Are these 10 failures 10 problems? | Failures are clustered by a normalized error signature (URLs, numbers and durations stripped), so one broken runner reads as one cluster, not ten bugs |
+| What did `retries: 1` hide? | Flaky tests are judged by the failure the retry hid, and listed under **Hidden by retries** — a suite that is green only on the second attempt says so |
+| Is a timeout real? | When most failures in a run are network errors, the run is flagged degraded and ambiguous timeouts are downgraded to `environment` automatically, with the reason printed |
+| Did a documented defect get fixed? | A `test.fail()` case that passes is reported as **defect no longer reproduces** — the signal to drop the annotation |
+
+The verdict drives the exit code, so CI can act on it:
+
+| Verdict | Meaning | Exit code (`--fail-on product`, the default) |
+|---|---|---|
+| 🟢 `PASS` | Clean run, no retries | 0 |
+| 🟡 `FLAKY` | Green, but retries hid failures | 0 |
+| 🟡 `INFRA` | Every hard failure is environmental — re-run, do not open bugs | 0 |
+| 🟠 `REVIEW` | No confirmed defect, but something needs a human | 0 |
+| 🔴 `BLOCK` | Product-level failure — do not ship | 1 |
+
+```bash
+node scripts/review-report.mjs --input test-results/results.json \
+  --out review.md --json review.json --fail-on product|any|none
+```
+
+The rules live in one ordered table at the top of `scripts/review-report.mjs`; an
+unmatched error is reported as `unclassified` rather than guessed at, which is the
+cue to add a rule. `npm run review:test` covers each rule and each verdict.
+
+In CI the review is appended to the **job summary** and posted (and updated in place)
+as a **PR comment**, so a failing run explains itself in the pull request instead of
+sending the reviewer into the HTML artifact.
+
+### Where Claude fits
+
+The script is deterministic on purpose — the same report always yields the same
+verdict, and it costs nothing to run on every push. It handles the mechanical pass:
+classify, cluster, and rank. Claude then works from `review.json` for the judgement
+pass a rule table cannot do — reading a trace to confirm a `suspect` finding, writing
+the defect report, or proposing the fix — which is why the review is emitted as JSON
+as well as Markdown.
+
 ## CI
 
-Every push and pull request runs ESLint and the full suite on `ubuntu-latest` via
-[`.github/workflows/playwright.yml`](.github/workflows/playwright.yml) and
-uploads the HTML report as an artifact.
+Every push and pull request runs ESLint, the reviewer's own unit tests and the full
+suite on `ubuntu-latest` via
+[`.github/workflows/playwright.yml`](.github/workflows/playwright.yml). It then runs
+the automated report review — which executes even when the suite is red, since that is
+exactly when its triage matters — publishes it to the job summary and the PR, and
+uploads the HTML report plus `review.md` / `review.json` as an artifact.
