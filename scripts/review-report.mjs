@@ -11,7 +11,7 @@
  * Usage:
  *   node scripts/review-report.mjs [--input test-results/results.json]
  *                                  [--out review.md] [--json review.json]
- *                                  [--fail-on product|any|none]
+ *                                  [--fail-on product|any|none] [--quiet]
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -112,6 +112,7 @@ function parseArgs(argv) {
     out: null,
     json: null,
     failOn: 'product',
+    quiet: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const [flag, inlineValue] = argv[i].split('=');
@@ -123,6 +124,7 @@ function parseArgs(argv) {
     else if (flag === '--out' || flag === '-o') { args.out = value; consume(); }
     else if (flag === '--json') { args.json = value; consume(); }
     else if (flag === '--fail-on') { args.failOn = value; consume(); }
+    else if (flag === '--quiet' || flag === '-q') { args.quiet = true; }
     else if (flag === '--help' || flag === '-h') { args.help = true; }
   }
   return args;
@@ -390,7 +392,7 @@ export function toMarkdown(result) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log('Usage: node scripts/review-report.mjs [--input <results.json>] [--out <review.md>] [--json <review.json>] [--fail-on product|any|none]');
+    console.log('Usage: node scripts/review-report.mjs [--input <results.json>] [--out <review.md>] [--json <review.json>] [--fail-on product|any|none] [--quiet]');
     return 0;
   }
 
@@ -433,7 +435,13 @@ function main() {
       })),
     }, null, 2)}\n`);
   }
-  console.log(markdown);
+  if (args.quiet) {
+    const { stats, verdict } = result;
+    console.log(`${VERDICT_BADGE[verdict.level].replace(/\*\*/g, '')} — ${verdict.headline}`);
+    console.log(`${stats.passed + stats.flaky}/${stats.total} passing · ${stats.failed} failed · ${stats.flaky} flaky`);
+  } else {
+    console.log(markdown);
+  }
 
   if (args.failOn === 'none') return 0;
   if (args.failOn === 'any') return result.findings.some((f) => !f.recovered) ? 1 : 0;

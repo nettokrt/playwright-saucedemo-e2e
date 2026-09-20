@@ -145,20 +145,22 @@ What the review answers that the HTML report does not:
 | Is a timeout real? | When most failures in a run are network errors, the run is flagged degraded and ambiguous timeouts are downgraded to `environment` automatically, with the reason printed |
 | Did a documented defect get fixed? | A `test.fail()` case that passes is reported as **defect no longer reproduces** — the signal to drop the annotation |
 
-The verdict drives the exit code, so CI can act on it:
+The verdict drives the exit code, so it can end a pipeline:
 
-| Verdict | Meaning | Exit code (`--fail-on product`, the default) |
-|---|---|---|
-| 🟢 `PASS` | Clean run, no retries | 0 |
-| 🟡 `FLAKY` | Green, but retries hid failures | 0 |
-| 🟡 `INFRA` | Every hard failure is environmental — re-run, do not open bugs | 0 |
-| 🟠 `REVIEW` | No confirmed defect, but something needs a human | 0 |
-| 🔴 `BLOCK` | Product-level failure — do not ship | 1 |
+| Verdict | Meaning | `--fail-on product` | `--fail-on any` |
+|---|---|---|---|
+| 🟢 `PASS` | Clean run, no retries | 0 | 0 |
+| 🟡 `FLAKY` | Green, but retries hid failures | 0 | 0 |
+| 🟡 `INFRA` | Every hard failure is environmental — re-run, do not open bugs | 0 | 1 |
+| 🟠 `REVIEW` | No confirmed defect, but something needs a human | 0 | 1 |
+| 🔴 `BLOCK` | Product-level failure — do not ship | 1 | 1 |
 
 ```bash
 node scripts/review-report.mjs --input test-results/results.json \
-  --out review.md --json review.json --fail-on product|any|none
+  --out review.md --json review.json --fail-on product|any|none [--quiet]
 ```
+
+`--quiet` prints the verdict line only, for use as a pipeline gate.
 
 The rules live in one ordered table at the top of `scripts/review-report.mjs`; an
 unmatched error is reported as `unclassified` rather than guessed at, which is the
@@ -166,7 +168,8 @@ cue to add a rule. `npm run review:test` covers each rule and each verdict.
 
 In CI the review is appended to the **job summary** and posted (and updated in place)
 as a **PR comment**, so a failing run explains itself in the pull request instead of
-sending the reviewer into the HTML artifact.
+sending the reviewer into the HTML artifact — and the verdict, not the raw runner exit
+code, is what ends the pipeline.
 
 ### Where Claude fits
 
@@ -181,7 +184,15 @@ as well as Markdown.
 
 Every push and pull request runs ESLint, the reviewer's own unit tests and the full
 suite on `ubuntu-latest` via
-[`.github/workflows/playwright.yml`](.github/workflows/playwright.yml). It then runs
-the automated report review — which executes even when the suite is red, since that is
-exactly when its triage matters — publishes it to the job summary and the PR, and
-uploads the HTML report plus `review.md` / `review.json` as an artifact.
+[`.github/workflows/playwright.yml`](.github/workflows/playwright.yml):
+
+```
+eslint → review:test → playwright test → review → PR comment → artifact → verdict
+```
+
+The suite runs with `continue-on-error`, so a red run does not abort the pipeline
+before the report has been read — a red run is exactly when the triage matters. The
+review publishes to the job summary and the PR and uploads `review.md` / `review.json`
+alongside the HTML report, and the **last step is the verdict** (`--fail-on any`): it
+prints one line and its exit code passes or fails the job. So a failed pipeline already
+says whether to open a defect or just re-run on a healthy runner.

@@ -25,13 +25,17 @@ jobs:
 
       - run: npx playwright install --with-deps
 
-      - run: npx playwright test
+      # The raw exit code does not end the pipeline: the review reads the report
+      # first, so the job fails with a reason ("product defect" vs "broken runner")
+      # instead of a bare "tests failed".
+      - name: Run the regression suite
+        id: regression
+        continue-on-error: true
+        run: npx playwright test
 
-      # The review runs even when the suite is red — a red run is exactly when
-      # its triage (product defect vs. environment) is worth reading.
       - name: Review the report
         if: always()
-        run: npm run --silent review >> "$GITHUB_STEP_SUMMARY"
+        run: npm run --silent review -- --fail-on none >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment the review on the PR
         if: always() && github.event_name == 'pull_request'
@@ -56,3 +60,10 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+
+      # Last step: the verdict is what passes or fails the pipeline. A green suite
+      # with retries still passes; any unrecovered failure fails, and the printed
+      # verdict says whether to open a bug or re-run.
+      - name: Verdict
+        if: always()
+        run: node scripts/review-report.mjs --quiet --fail-on any
